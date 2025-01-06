@@ -1,0 +1,22 @@
+---
+# tasks file for roles/wordpress
+- name: Create a Docker volume for WordPress data
+  community.docker.docker_volume:
+    name: wordpress_data
+
+- name: Run the WordPress container
+  community.docker.docker_container:
+    name: wordpress01
+    image: wordpress
+    published_ports: 
+    - "80:80"
+    volumes:
+      - wordpress_data:/var/www/html
+    etc_hosts: 
+      host.docker.internal: host-gateway
+    env:
+      WORDPRESS_DB_HOST: "host.docker.internal"
+      WORDPRESS_DB_USER: "wpuser"
+      WORDPRESS_DB_PASSWORD: "bXBYbS43qF"
+      WORDPRESS_DB_NAME: "wordpress"
+      WORDPRESS_TABLE_PREFIX: "wp_"

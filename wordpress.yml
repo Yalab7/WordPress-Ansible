@@ -1,0 +1,28 @@
+---
+- name: Provision EC2
+  become: yes
+  hosts: localhost
+  gather_facts: no
+  roles:
+    - ec2
+
+- name: Configure MySQL
+  become: yes
+  hosts: all
+  gather_facts: yes
+  roles:
+    - mysql
+
+- name: Install Docker
+  become: yes
+  hosts: all
+  gather_facts: no
+  roles:
+    - docker
+
+- name: Run WordPress
+  become: yes
+  hosts: all
+  gather_facts: no
+  roles:
+    - wordpress

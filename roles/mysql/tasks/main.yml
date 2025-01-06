@@ -1,0 +1,98 @@
+---
+# tasks file for roles/mysql
+- name: Show EC2 instance details
+  debug:
+    msg: "{{ ansible_facts }}"
+- name: Update apt cache and install required packages
+  ansible.builtin.apt:
+    update_cache: yes
+    name:
+      - mysql-server-8.0
+      - python3-pip
+    state: present
+  when: ansible_facts['distribution'] == 'Ubuntu'
+
+- name: Update apt cache and install required packages
+  ansible.builtin.yum:
+    update_cache: yes
+    name:
+      - mysql-server-8.0
+      - python2-PyMySQL
+    state: present
+  when: ansible_facts['distribution'] == 'Amazon'
+
+- name: Install PyMySQL
+  pip:
+    name: pymysql
+    state: present
+
+- name: Ensure MySQL is started and enabled
+  service:
+    name: mysql
+    state: started
+    enabled: yes
+
+- name: Check if the .my.cnf file exists
+  stat:
+    path: ~/.my.cnf.j2
+  register: mycnf
+
+- name: Set MySQL root password and authentication
+  shell: |
+    mysql -e "ALTER USER 'root'@'localhost' IDENTIFIED WITH mysql_native_password BY '{{ mysql_root_password }}'; FLUSH PRIVILEGES;"
+  when: not mycnf.stat.exists
+
+- name: Deploy MySQL .my.cnf for root user
+  template:
+    src: my.cnf.j2
+    dest: ~/.my.cnf
+    mode: '0600'
+
+- name: Create new WordPress database
+  community.mysql.mysql_db:
+    name: wordpress
+    state: present
+
+- name: Create WordPress user
+  community.mysql.mysql_user:
+    name: "{{ mysql_user }}"
+    password: "{{ mysql_user_password }}"
+    host: '%'
+    priv: 'wordpress.*:ALL'
+    state: present
+
+- name: Update MySQL bind-address
+  ansible.builtin.lineinfile:
+    path: /etc/mysql/mysql.conf.d/mysqld.cnf
+    regexp: '^bind-address'
+    line: "bind-address = 0.0.0.0"
+    state: present
+  notify: Restart MySQL
+
+- name: Create backup directory
+  file:
+    path: "{{ backup_dir }}"
+    state: directory
+    owner: root
+    group: root
+    mode: '0755'
+
+- name: Create MySQL backup script
+  copy:
+    dest: "/usr/local/bin/mysql_backup.sh"
+    content: |
+      #!/usr/bin/env bash
+      BACKUP_DIR={{ backup_dir }}
+      TIMESTAMP=$(date +"%Y%m%d%H%M%S")
+      BACKUP_FILE="$BACKUP_DIR/all-databases-$TIMESTAMP.sql"
+      mysqldump -u root -p{{ mysql_root_password }} --all-databases > $BACKUP_FILE
+    owner: root
+    group: root
+    mode: '0750'
+
+- name: Add cron job for MySQL backup
+  cron:
+    name: "Daily MySQL Backup"
+    minute: "0"
+    hour: "2"
+    job: "/usr/local/bin/mysql_backup.sh"

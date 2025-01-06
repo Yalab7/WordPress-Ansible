@@ -1,0 +1,6 @@
+---
+# defaults file for roles/mysql
+mysql_root_password: "kelmet_ser"
+mysql_user: "wpuser"
+mysql_user_password: "bXBYbS43qF"
+backup_dir: "/var/backups/mysql"
